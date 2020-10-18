@@ -261,22 +261,26 @@ def get_patch_grads(p):
 # to create the histogram for each subregion
 def get_histogram_for_subregion(m, theta, num_bin, reference_angle, bin_width, subregion_w):
     hist = np.zeros(num_bin, dtype=np.float32)
-    c = subregion_w / 2 - .5
-    for mag, angle in zip(m, theta):
-        angle = (angle - reference_angle) % 360
+    c = subregion_w/2 - .5
+
+    for i, (mag, angle) in enumerate(zip(m, theta)):
+        angle = (angle-reference_angle) % 360
         binno = quantize_orientation(angle, num_bin)
         vote = mag
 
-        hist_interp_weight = 1 - abs(angle - (binno * bin_width + bin_width / 2)) / (bin_width / 2)
+        # binno*bin_width is the start angle of the histogram bin
+        # binno*bin_width+bin_width/2 is the center of the histogram bin
+        # angle - " is the distance from the angle to the center of the bin
+        hist_interp_weight = 1 - abs(angle - (binno*bin_width + bin_width/2))/(bin_width/2)
         vote *= max(hist_interp_weight, 1e-6)
+
         gy, gx = np.unravel_index(i, (subregion_w, subregion_w))
-        x_interp_weight = max(1 - abs(gx - c) / c, 1e-6)
-        y_interp_weight = max(1 - abs(gy - c) / c, 1e-6)
+        x_interp_weight = max(1 - abs(gx - c)/c, 1e-6)
+        y_interp_weight = max(1 - abs(gy - c)/c, 1e-6)
         vote *= x_interp_weight * y_interp_weight
+
         hist[binno] += vote
-    hist /= max(1e-6, LA.norm(hist))
-    hist[hist > 0.2] = 0.2
-    hist /= max(1e-6, LA.norm(hist))
+
     return hist
 
 
@@ -303,7 +307,34 @@ class SIFT(object):
         self.feats = feats
         return feats
 
+import argparse
+import pickle
+import os
+from os.path import isdir
+
+parser = argparse.ArgumentParser(description='PySIFT')
+parser.add_argument('--input', type=str, dest='input_fname')
+parser.add_argument('--output', type=str, dest='output_prefix',
+                    help='The prefix for the kp_pyr and feat_pyr files generated')
+args = parser.parse_args()
 
 im = io.imread('images/sample.jpg')
 sift_detector = SIFT(im)
-im
+_ = sift_detector.get_features()
+kp_pyr = sift_detector.kp_pyr
+
+if not isdir('results'):
+    os.mkdir('results')
+
+pickle.dump(sift_detector.kp_pyr, open('results/%s_kp_pyr.pkl' % args.output_prefix, 'wb'))
+pickle.dump(sift_detector.feats, open('results/%s_feat_pyr.pkl' % args.output_prefix, 'wb'))
+
+_, ax = plt.subplots(1, sift_detector.num_octave)
+
+for i in range(sift_detector.num_octave):
+    ax[i].imshow(im)
+
+    scaled_kps = kp_pyr[i] * (2 ** i)
+    ax[i].scatter(scaled_kps[:, 0], scaled_kps[:, 1], c='r', s=2.5)
+
+plt.show()
