@@ -7,8 +7,8 @@ from skimage.filters import laplace
 from skimage.filters import difference_of_gaussians
 from skimage.filters import threshold_otsu
 
-image = io.imread("images/synimg.jpg")
-#image = io.imread("images/sample.jpg")
+#image = io.imread("images/synimg.jpg")
+image = io.imread("images/sample.jpg")
 image_gray = rgb2gray(image)
 
 fig, axes = plt.subplots(3, 5, figsize=(16, 9))
